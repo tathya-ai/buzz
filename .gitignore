@@ -15,6 +15,10 @@ __pycache__/
 .env.local
 .env.*.local
 
+# Local operator artifacts and exports can contain workspace data.
+exports/
+*.csv
+
 # Editor / IDE
 .idea/
 .vscode/*
