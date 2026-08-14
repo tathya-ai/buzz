@@ -20,6 +20,12 @@
       "platforms": ["desktop"]
     },
     {
+      "id": "dashboards",
+      "name": "Dashboards",
+      "description": "Owner-published operating views over signed relay records",
+      "platforms": ["desktop"]
+    },
+    {
       "id": "forum",
       "name": "Forum Channels",
       "description": "Forum-style threaded channels for long-form discussions",

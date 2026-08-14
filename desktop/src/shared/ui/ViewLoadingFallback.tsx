@@ -7,6 +7,7 @@ import { TopChromeInsetHeader } from "@/shared/layout/TopChromeInsetHeader";
 type ViewLoadingFallbackKind =
   | "agents"
   | "channel"
+  | "dashboards"
   | "forum"
   | "projects"
   | "pulse"

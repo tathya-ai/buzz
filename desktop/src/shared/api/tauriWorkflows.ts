@@ -83,10 +83,7 @@ type RawTriggerWorkflowResponse = {
 };
 
 type RawApprovalActionResponse = {
-  token: string;
-  status: string;
-  run_id: string;
-  workflow_id: string;
+  event_id: string;
 };
 
 // ── Conversion functions ──────────────────────────────────────────────────
@@ -167,10 +164,7 @@ function fromRawApprovalResponse(
   raw: RawApprovalActionResponse,
 ): ApprovalActionResponse {
   return {
-    token: raw.token,
-    status: raw.status,
-    runId: raw.run_id,
-    workflowId: raw.workflow_id,
+    eventId: raw.event_id,
   };
 }
 

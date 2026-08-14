@@ -549,7 +549,7 @@ Note: Both `TriggerDef` and `ActionDef` use serde internally-tagged enums. Trigg
 
 **Concurrency:** `Arc<Semaphore>` with 100 permits. `try_acquire()` — returns `CapacityExceeded` immediately rather than queuing.
 
-**Approval gates:** `request_approval` action returns `StepResult::Suspended` with a generated UUID token, but the engine does not yet persist the token or resume execution — runs that hit an approval gate are marked as failed (🚧 WF-08). `execute_from_step()` exists for future resumption support.
+**Approval gates:** `request_approval` persists an approval record and leaves the run in `waiting_approval`. Signed kind `46030` grants resume execution at the next step. Signed kind `46031` denials cancel the run. The relay validates the 64-character approval reference and designated approver before changing run state.
 
 **Cron scheduler:** loop ticks every 60 seconds, evaluates cron expressions with window-based matching, and creates workflow runs for matched triggers. Fully implemented.
 

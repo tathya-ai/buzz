@@ -28,13 +28,6 @@ function BackendSupportHint({ action }: { action: StepFormState["action"] }) {
           this step.
         </p>
       );
-    case "request_approval":
-      return (
-        <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs text-amber-700">
-          Backend note: approval gates still stop runs with WF-08; approval
-          records are not persisted yet.
-        </p>
-      );
     default:
       return null;
   }
@@ -220,9 +213,13 @@ function StepConfigFields({
               onChange={(event) =>
                 onUpdate({ ...step, from: event.target.value })
               }
-              placeholder="Pubkey or role"
+              placeholder="64-character approver pubkey"
               value={step.from ?? ""}
             />
+            <p className="text-xs text-muted-foreground">
+              Use the exact hex public key for a restricted approval. The value
+              `any` allows every authenticated member to decide.
+            </p>
           </div>
           <div className="space-y-1.5">
             <FieldLabel htmlFor={`${prefix}-message`}>Message</FieldLabel>

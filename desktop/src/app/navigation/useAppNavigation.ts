@@ -79,6 +79,17 @@ export function useAppNavigation() {
     [commitNavigation],
   );
 
+  const goDashboards = React.useCallback(
+    (behavior?: NavigationBehavior) =>
+      commitNavigation(
+        {
+          to: "/dashboards",
+        },
+        behavior,
+      ),
+    [commitNavigation],
+  );
+
   const goProfile = React.useCallback(
     (pubkey: string, behavior?: NavigationBehavior) =>
       commitNavigation(
@@ -316,6 +327,7 @@ export function useAppNavigation() {
     closeWorkflowDetail,
     goAgents,
     goChannel,
+    goDashboards,
     goForumPost,
     goHome,
     goNewMessage,
