@@ -122,7 +122,7 @@ Relay communities can pool opted-in member hardware into shared AI compute. Exis
 
 Channel-scoped YAML-as-code automation with conditional logic — the feature Slack paywalled for 5 years. Message triggers, reaction triggers, scheduled runs, webhooks. Every step traced. Agents manage workflows through MCP tools.
 
-Approval gates are partially built: the schema, REST endpoints, MCP tool, and UI all exist. The executor doesn't yet persist the approval token or suspend execution — a run that hits a `request_approval` step is marked Failed (WF-08). The infrastructure is there; the wiring is next.
+Approval gates suspend a run and persist an approval record. A designated approver can publish a signed grant or denial from the workflow UI. A grant resumes the remaining steps; a denial cancels the run. The dashboard operating-loop surface shows the same run trace and pending decision.
 
 ---
 

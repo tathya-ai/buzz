@@ -8,6 +8,27 @@ HTML.
 Dashboards are a desktop preview feature. Enable **Dashboards** in Settings →
 Experiments, then open **Dashboards** in the sidebar.
 
+## Operating loop and agent team
+
+Every dashboard also includes two native community surfaces:
+
+- **Operating loop** lists workflows from the viewer's channels, starts runs,
+  renders the signed step trace, and exposes pending approval decisions.
+- **Agent team** lists kind `10100` relay-agent profiles with their published
+  type, capabilities, channel assignments, and status.
+
+Approval decisions are kind `46030` (grant) and `46031` (deny) events. Their
+`d` tag carries the relay-issued 64-character approval reference. The relay
+checks the event signer against the workflow's exact `from` public key before
+resuming or cancelling the run.
+
+This makes a dashboard an operating surface for the sequence:
+
+`direction -> signal -> proposed action -> approval -> execution -> evidence -> outcome`
+
+Workflow definitions decide the actual steps. Dashboard manifests do not gain
+execution authority from these panels.
+
 ## Manifest event
 
 A dashboard manifest is a kind `30078` event with:

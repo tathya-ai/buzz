@@ -3365,14 +3365,32 @@ type RawWorkflowRun = {
   created_at: number;
 };
 
+type RawWorkflowApproval = {
+  approval_ref: string;
+  workflow_id: string;
+  run_id: string;
+  step_id: string;
+  step_index: number;
+  approver_spec: string;
+  status: "pending" | "granted" | "denied" | "expired";
+  approver_pubkey: string | null;
+  note: string | null;
+  expires_at: string;
+  created_at: number;
+};
+
 const mockWorkflows: MockWorkflow[] = [];
 let mockWorkflowRuns: RawWorkflowRun[] = [];
+let mockWorkflowApprovals: RawWorkflowApproval[] = [];
 let mockWorkflowIdCounter = 0;
+let mockWorkflowRunCounter = 0;
 
 function resetMockWorkflows() {
   mockWorkflows.length = 0;
   mockWorkflowRuns = [];
+  mockWorkflowApprovals = [];
   mockWorkflowIdCounter = 0;
+  mockWorkflowRunCounter = 0;
 }
 
 function parseWorkflowDefinition(
@@ -3463,6 +3481,9 @@ function handleDeleteWorkflow(args: { workflowId: string }) {
   mockWorkflowRuns = mockWorkflowRuns.filter(
     (run) => run.workflow_id !== args.workflowId,
   );
+  mockWorkflowApprovals = mockWorkflowApprovals.filter(
+    (approval) => approval.workflow_id !== args.workflowId,
+  );
 }
 
 function buildMockWorkflowRun(workflow: MockWorkflow): RawWorkflowRun {
@@ -3470,6 +3491,7 @@ function buildMockWorkflowRun(workflow: MockWorkflow): RawWorkflowRun {
   const rawSteps = Array.isArray(workflow.definition.steps)
     ? workflow.definition.steps
     : [];
+  let waitingApprovalIndex = -1;
   const executionTrace = rawSteps.map((candidate, index) => {
     const step =
       candidate && typeof candidate === "object"
@@ -3489,15 +3511,22 @@ function buildMockWorkflowRun(workflow: MockWorkflow): RawWorkflowRun {
       output.preview = step.text;
     }
 
+    const isApproval = step.action === "request_approval";
+    if (isApproval && waitingApprovalIndex === -1) waitingApprovalIndex = index;
     return {
       step_id:
         typeof step.id === "string" && step.id.trim().length > 0
           ? step.id
           : `step_${index + 1}`,
-      status: "completed",
+      status:
+        waitingApprovalIndex === -1
+          ? "completed"
+          : index === waitingApprovalIndex
+            ? "waiting_approval"
+            : "pending",
       output,
       started_at: startedAt,
-      completed_at: completedAt,
+      completed_at: waitingApprovalIndex === -1 ? completedAt : null,
       error: null,
     };
   });
@@ -3512,14 +3541,39 @@ function buildMockWorkflowRun(workflow: MockWorkflow): RawWorkflowRun {
       ? (lastTraceEntry?.completed_at ?? createdAt)
       : createdAt;
 
+  mockWorkflowRunCounter += 1;
+  const runId = `mock-run-${mockWorkflowRunCounter}`;
+  if (waitingApprovalIndex >= 0) {
+    const step = rawSteps[waitingApprovalIndex] as Record<string, unknown>;
+    mockWorkflowApprovals.push({
+      approval_ref: mockWorkflowRunCounter.toString(16).padStart(64, "0"),
+      workflow_id: workflow.id,
+      run_id: runId,
+      step_id:
+        typeof step.id === "string" && step.id.trim().length > 0
+          ? step.id
+          : `step_${waitingApprovalIndex + 1}`,
+      step_index: waitingApprovalIndex,
+      approver_spec:
+        typeof step.from === "string" && step.from.trim().length > 0
+          ? step.from
+          : "owner",
+      status: "pending",
+      approver_pubkey: null,
+      note: null,
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      created_at: createdAt,
+    });
+  }
+
   return {
-    id: `mock-run-${Date.now()}`,
+    id: runId,
     workflow_id: workflow.id,
-    status: "completed",
-    current_step: null,
+    status: waitingApprovalIndex >= 0 ? "waiting_approval" : "completed",
+    current_step: waitingApprovalIndex >= 0 ? waitingApprovalIndex : null,
     execution_trace: executionTrace,
     started_at: startedAt,
-    completed_at: completedAt,
+    completed_at: waitingApprovalIndex >= 0 ? null : completedAt,
     error_code: null,
     error_message: null,
     created_at: createdAt,
@@ -3551,8 +3605,51 @@ function handleGetWorkflowRuns(args: {
   };
 }
 
-function handleGetRunApprovals(_args: { workflowId: string; runId: string }) {
-  return { approvals: [] };
+function handleGetRunApprovals(args: { workflowId: string; runId: string }) {
+  return {
+    approvals: mockWorkflowApprovals.filter(
+      (approval) =>
+        approval.workflow_id === args.workflowId &&
+        approval.run_id === args.runId,
+    ),
+  };
+}
+
+function handleApprovalAction(
+  args: { token: string; note?: string | null },
+  action: "granted" | "denied",
+) {
+  const approval = mockWorkflowApprovals.find(
+    (candidate) => candidate.approval_ref === args.token,
+  );
+  if (approval?.status !== "pending") {
+    throw new Error("Approval is no longer pending");
+  }
+  approval.status = action;
+  approval.note = args.note ?? null;
+  approval.approver_pubkey = MOCK_IDENTITY_PUBKEY;
+  const run = mockWorkflowRuns.find(
+    (candidate) => candidate.id === approval.run_id,
+  );
+  if (run) {
+    if (action === "granted") {
+      run.execution_trace = run.execution_trace.map((step, index) => ({
+        ...step,
+        status: index < approval.step_index ? step.status : "completed",
+        completed_at: step.completed_at ?? Math.floor(Date.now() / 1000),
+      }));
+      run.status = "completed";
+      run.current_step = null;
+      run.completed_at = Math.floor(Date.now() / 1000);
+    } else {
+      run.status = "cancelled";
+      run.current_step = null;
+      run.completed_at = Math.floor(Date.now() / 1000);
+      run.error_code = "approval_denied";
+      run.error_message = "Workflow cancelled after approval was denied";
+    }
+  }
+  return { event_id: `mock-${action}-event` };
 }
 
 const mockProfiles = new Map<string, RawProfile>([
@@ -12984,6 +13081,16 @@ export function maybeInstallE2eTauriMocks() {
       case "get_run_approvals":
         return handleGetRunApprovals(
           payload as Parameters<typeof handleGetRunApprovals>[0],
+        );
+      case "grant_approval":
+        return handleApprovalAction(
+          payload as Parameters<typeof handleApprovalAction>[0],
+          "granted",
+        );
+      case "deny_approval":
+        return handleApprovalAction(
+          payload as Parameters<typeof handleApprovalAction>[0],
+          "denied",
         );
       case "plugin:webview|set_webview_zoom":
         window.__BUZZ_E2E_WEBVIEW_ZOOM__ = (payload as { value: number }).value;

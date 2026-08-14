@@ -251,3 +251,50 @@ test("triggers a workflow from the detail panel", async ({ page }) => {
     page.getByTestId("workflow-detail-panel").getByTestId("workflow-run-trace"),
   ).toContainText("step_1");
 });
+
+test("approves a suspended workflow and resumes its remaining steps", async ({
+  page,
+}) => {
+  const workflowName = `approval_loop_${Date.now()}`;
+
+  await navigateToWorkflows(page);
+  await page.getByRole("button", { name: "Create Workflow" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Edit as YAML" }).click();
+  await dialog.locator("textarea").fill(`name: ${workflowName}
+description: Signal to evidence operating loop
+trigger:
+  on: webhook
+steps:
+  - id: propose
+    action: request_approval
+    from: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    message: Approve the proposed action?
+  - id: execute
+    action: delay
+    duration: 1s
+  - id: evidence
+    action: send_message
+    channel: 9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50
+    text: Evidence recorded
+`);
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await page.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("button", { name: `View ${workflowName}` }).click();
+  const detail = page.getByTestId("workflow-detail-panel");
+  await detail.getByRole("button", { name: "Trigger" }).click();
+  await expect(detail.getByText("Approval Required")).toBeVisible();
+  await detail
+    .getByLabel("Decision note (optional)")
+    .fill("Proceed with evidence");
+  await detail.getByRole("button", { name: "Approve" }).click();
+
+  await expect(detail.getByText("Approval Required")).not.toBeVisible();
+  await expect(detail.getByTestId("workflow-selected-run")).toContainText(
+    "completed",
+  );
+  await expect(detail.getByTestId("workflow-run-trace")).toContainText(
+    "evidence",
+  );
+});

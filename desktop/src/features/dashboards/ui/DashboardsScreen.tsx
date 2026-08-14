@@ -8,6 +8,8 @@ import {
   type DashboardPanel,
 } from "../model";
 import { useDashboards } from "../hooks";
+import { AgentTeamPanel } from "./AgentTeamPanel";
+import { OperatingLoopPanel } from "./OperatingLoopPanel";
 
 function MetricPanel({
   panel,
@@ -189,6 +191,8 @@ export function DashboardsScreen() {
             </div>
 
             <div className="space-y-7">
+              <OperatingLoopPanel />
+              <AgentTeamPanel />
               {selected.manifest.panels.map((panel) => {
                 const data = parseRecordContent(records.get(panel.source.dTag));
                 return (
